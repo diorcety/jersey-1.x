@@ -227,14 +227,11 @@ public class RequestWriter {
          */
         public void writeRequestEntity(OutputStream out) throws IOException {
             out = cr.getAdapter().adapt(cr, out);
-            try {
-                bw.writeTo(entity, entity.getClass(), entityType,
-                        EMPTY_ANNOTATIONS, mediaType, cr.getMetadata(),
-                        out);
-                out.flush();
-            } finally {
-                out.close();
-            }
+            bw.writeTo(entity, entity.getClass(), entityType,
+                    EMPTY_ANNOTATIONS, mediaType, cr.getMetadata(),
+                    out);
+            out.flush();
+            out.close();
         }
     }
 
@@ -296,18 +293,9 @@ public class RequestWriter {
         listener.onRequestEntitySize(size);
 
         final OutputStream out = ro.getAdapter().adapt(ro, listener.onGetOutputStream());
-        try {
-            bw.writeTo(entity, entityClass, entityType,
-                    EMPTY_ANNOTATIONS, mediaType, headers, out);
-            out.flush();
-        } catch (IOException ex) {
-            try { out.close(); } catch (Exception e) { }
-            throw ex;
-        } catch (RuntimeException ex) {
-            try { out.close(); } catch (Exception e) { }
-            throw ex;
-        }
-
+        bw.writeTo(entity, entityClass, entityType,
+                EMPTY_ANNOTATIONS, mediaType, headers, out);
+        out.flush();
         out.close();
     }
 

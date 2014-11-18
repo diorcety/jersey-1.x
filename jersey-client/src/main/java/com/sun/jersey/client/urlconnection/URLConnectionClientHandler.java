@@ -165,104 +165,109 @@ public final class URLConnectionClientHandler extends TerminatingClientHandler {
             uc = this.httpURLConnectionFactory.getHttpURLConnection(ro.getURI().toURL());
         }
 
-        Integer readTimeout = (Integer)ro.getProperties().get(
-                ClientConfig.PROPERTY_READ_TIMEOUT);
-        if (readTimeout != null) {
-            uc.setReadTimeout(readTimeout);
-        }
-
-        Integer connectTimeout = (Integer)ro.getProperties().get(
-                ClientConfig.PROPERTY_CONNECT_TIMEOUT);
-        if (connectTimeout != null) {
-            uc.setConnectTimeout(connectTimeout);
-        }
-
-        Boolean followRedirects = (Boolean)ro.getProperties().get(
-                ClientConfig.PROPERTY_FOLLOW_REDIRECTS);
-        if (followRedirects != null) {
-            uc.setInstanceFollowRedirects(followRedirects);
-        }
-
-        if (uc instanceof HttpsURLConnection) {
-            HTTPSProperties httpsProperties = (HTTPSProperties) ro.getProperties().get(
-                    HTTPSProperties.PROPERTY_HTTPS_PROPERTIES);
-            if (httpsProperties != null) {
-                httpsProperties.setConnection((HttpsURLConnection)uc);
+        try {
+            Integer readTimeout = (Integer) ro.getProperties().get(
+                    ClientConfig.PROPERTY_READ_TIMEOUT);
+            if (readTimeout != null) {
+                uc.setReadTimeout(readTimeout);
             }
-        }
 
-        Boolean httpUrlConnectionSetMethodWorkaround = (Boolean)ro.getProperties().get(
-                PROPERTY_HTTP_URL_CONNECTION_SET_METHOD_WORKAROUND);
-        if (httpUrlConnectionSetMethodWorkaround != null && httpUrlConnectionSetMethodWorkaround == true) {
-            setRequestMethodUsingWorkaroundForJREBug(uc, ro.getMethod());
-        } else {
-            uc.setRequestMethod(ro.getMethod());
-        }
+            Integer connectTimeout = (Integer) ro.getProperties().get(
+                    ClientConfig.PROPERTY_CONNECT_TIMEOUT);
+            if (connectTimeout != null) {
+                uc.setConnectTimeout(connectTimeout);
+            }
 
-        // Write the request headers
-        writeOutBoundHeaders(ro.getHeaders(), uc);
+            Boolean followRedirects = (Boolean) ro.getProperties().get(
+                    ClientConfig.PROPERTY_FOLLOW_REDIRECTS);
+            if (followRedirects != null) {
+                uc.setInstanceFollowRedirects(followRedirects);
+            }
 
-        // Write the entity (if any)
-        Object entity = ro.getEntity();
-        if (entity != null) {
-            uc.setDoOutput(true);
-
-            if(ro.getMethod().equalsIgnoreCase("GET")) {
-                final Logger logger = Logger.getLogger(URLConnectionClientHandler.class.getName());
-                if(logger.isLoggable(Level.INFO)) {
-                    logger.log(Level.INFO, "GET method with entity will be most likely replaced by POST, see http://java.net/jira/browse/JERSEY-1161");
+            if (uc instanceof HttpsURLConnection) {
+                HTTPSProperties httpsProperties = (HTTPSProperties) ro.getProperties().get(
+                        HTTPSProperties.PROPERTY_HTTPS_PROPERTIES);
+                if (httpsProperties != null) {
+                    httpsProperties.setConnection((HttpsURLConnection) uc);
                 }
             }
 
-            writeRequestEntity(ro, new RequestEntityWriterListener() {
-                public void onRequestEntitySize(long size) {
-                    if (size != -1 && size < Integer.MAX_VALUE) {
-                        // HttpURLConnection uses the int type for content length
-                        uc.setFixedLengthStreamingMode((int)size);
-                    } else {
-                        // TODO it appears HttpURLConnection has some bugs in
-                        // chunked encoding
-                        // uc.setChunkedStreamingMode(0);
-                        Integer chunkedEncodingSize = (Integer)ro.getProperties().get(
-                                ClientConfig.PROPERTY_CHUNKED_ENCODING_SIZE);
-                        if (chunkedEncodingSize != null) {
-                            uc.setChunkedStreamingMode(chunkedEncodingSize);
-                        }
+            Boolean httpUrlConnectionSetMethodWorkaround = (Boolean) ro.getProperties().get(
+                    PROPERTY_HTTP_URL_CONNECTION_SET_METHOD_WORKAROUND);
+            if (httpUrlConnectionSetMethodWorkaround != null && httpUrlConnectionSetMethodWorkaround == true) {
+                setRequestMethodUsingWorkaroundForJREBug(uc, ro.getMethod());
+            } else {
+                uc.setRequestMethod(ro.getMethod());
+            }
+
+            // Write the request headers
+            writeOutBoundHeaders(ro.getHeaders(), uc);
+
+            // Write the entity (if any)
+            Object entity = ro.getEntity();
+            if (entity != null) {
+                uc.setDoOutput(true);
+
+                if (ro.getMethod().equalsIgnoreCase("GET")) {
+                    final Logger logger = Logger.getLogger(URLConnectionClientHandler.class.getName());
+                    if (logger.isLoggable(Level.INFO)) {
+                        logger.log(Level.INFO, "GET method with entity will be most likely replaced by POST, see http://java.net/jira/browse/JERSEY-1161");
                     }
                 }
 
-                public OutputStream onGetOutputStream() throws IOException {
-                    return new CommittingOutputStream() {
-                        @Override
-                        protected OutputStream getOutputStream() throws IOException {
-                            return uc.getOutputStream();
+                writeRequestEntity(ro, new RequestEntityWriterListener() {
+                    public void onRequestEntitySize(long size) {
+                        if (size != -1 && size < Integer.MAX_VALUE) {
+                            // HttpURLConnection uses the int type for content length
+                            uc.setFixedLengthStreamingMode((int) size);
+                        } else {
+                            // TODO it appears HttpURLConnection has some bugs in
+                            // chunked encoding
+                            // uc.setChunkedStreamingMode(0);
+                            Integer chunkedEncodingSize = (Integer) ro.getProperties().get(
+                                    ClientConfig.PROPERTY_CHUNKED_ENCODING_SIZE);
+                            if (chunkedEncodingSize != null) {
+                                uc.setChunkedStreamingMode(chunkedEncodingSize);
+                            }
                         }
+                    }
 
-                        @Override
-                        public void commit() throws IOException {
-                            writeOutBoundHeaders(ro.getHeaders(), uc);
-                        }
-                    };
-                }
-            });
-        } else {
-            writeOutBoundHeaders(ro.getHeaders(), uc);
+                    public OutputStream onGetOutputStream() throws IOException {
+                        return new CommittingOutputStream() {
+                            @Override
+                            protected OutputStream getOutputStream() throws IOException {
+                                return uc.getOutputStream();
+                            }
+
+                            @Override
+                            public void commit() throws IOException {
+                                writeOutBoundHeaders(ro.getHeaders(), uc);
+                            }
+                        };
+                    }
+                });
+            } else {
+                writeOutBoundHeaders(ro.getHeaders(), uc);
+            }
+
+
+            final int code = uc.getResponseCode();
+            final String reasonPhrase = uc.getResponseMessage();
+            final Response.StatusType status = reasonPhrase == null ?
+                    Statuses.from(code) : Statuses.from(code, reasonPhrase);
+
+
+            // Return the in-bound response
+            return new URLConnectionResponse(
+                    status,
+                    getInputStream(uc),
+                    ro.getMethod(),
+                    getInBoundHeaders(uc),
+                    uc);
+        } catch (IOException e) {
+            uc.disconnect();
+            throw e;
         }
-
-
-        final int code = uc.getResponseCode();
-        final String reasonPhrase = uc.getResponseMessage();
-        final Response.StatusType status = reasonPhrase == null ?
-            Statuses.from(code) : Statuses.from(code, reasonPhrase);
-
-
-        // Return the in-bound response
-        return new URLConnectionResponse(
-                status,
-                getInputStream(uc),
-                ro.getMethod(),
-                getInBoundHeaders(uc),
-                uc);
     }
 
     /**
