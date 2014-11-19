@@ -136,27 +136,6 @@ public abstract class AbstractMojoProjectClasspathSupport extends AbstractMojo {
         final List<String> compileClasspathElements = mavenProject.getCompileClasspathElements();
         paths.addAll( compileClasspathElements );
         
-        /* Add build dependencies as classpath elements
-         */
-        @SuppressWarnings("unchecked")
-        final Collection<Dependency> dependencies = mavenProject.getDependencies();
-        if ( dependencies != null ) {
-            for ( Dependency dependency : dependencies ) {
-                if ( dependency.getSystemPath() != null ) {
-                    getLog().debug( "Adding dependency with systemPath " + dependency.getSystemPath() );
-                    paths.add( dependency.getSystemPath() );
-                }
-                else {
-                    final Artifact artifact = artifactFactory.createArtifactWithClassifier(
-                            dependency.getGroupId(), dependency.getArtifactId(),
-                            dependency.getVersion(), dependency.getType(), dependency.getClassifier() );
-                    resolver.resolve( artifact, remoteRepositories, localRepository );
-                    getLog().debug( "Adding artifact " + artifact.getFile().getPath() );
-                    paths.add( artifact.getFile().getPath() );
-                }
-            }
-        }
-        
         /* Add additional dependencies
          */
         if ( additionalDependencies != null ) {

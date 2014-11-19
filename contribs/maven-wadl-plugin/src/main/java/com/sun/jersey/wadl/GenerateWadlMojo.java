@@ -88,6 +88,7 @@ import com.sun.research.ws.wadl.Resources;
  *
  * @goal generate
  * @phase compile
+ * @requiresDependencyResolution compile+runtime
  */
 public class GenerateWadlMojo extends AbstractMojoProjectClasspathSupport {
 
